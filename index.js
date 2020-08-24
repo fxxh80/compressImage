@@ -1,39 +1,116 @@
 const fs = require('fs')
 const { pack } = require('texture-compressor');
  
-
-function compressImage(inputPath,outputPath,type,compression,quality,outputExt){
-	fs.readdir(inputPath,(err,files)=>{
-		if(err) return console.warn(err)
-		var inputFile,outputFile
-		for(let i=0,len = files.length;i<len;i++){
-			inputFile = files[i]
-			outputFile = inputFile.replace(".jpg",outputExt).replace(".png",outputExt)
-			console.info("packing file:",inputFile)
-			
-			pack({
-			  type: type,
-			  input: inputPath + inputFile,
-			  output: outputPath + outputFile,
-			  compression: compression,
-			  quality: quality,
-			  verbose: true,
-			}).then(() => console.log('done!'));
+ function walkFile(files, onFile, onComplete) {
+	if (files.length == 0) {
+		onComplete()
+		return
+	}
+	let file = files.pop()
+	// console.info("walkFile",file)
+	fs.stat(file,(err,stats) => {
+		if(err ||!stats){
+			console.error("fs.stat fail", err, file);
+			walkFile(files, onFile, onComplete)
+			return
+		}
+		if (stats.isDirectory()){
+			fs.readdir(file,(err,files2)=>{
+				if(err) 
+					return console.warn(err)
+				for (let f of files2) {
+					files.push(file + "/" + f)
+				}
+				walkFile(files, onFile, onComplete)
+			});
+		} else {
+		  onFile(file, files, onFile, onComplete)
 		}
 	});
 }
 
+function dirname(path){
+ 	var arr = path.split("/")
+ 	arr.pop();
+ 	return arr.join("/");
+ }
+
+function mkdir(filePath){
+ 	var filePath = dirname(filePath)
+ 	if(!fs.existsSync(filePath)){
+	 	fs.mkdir(filePath, { recursive: true }, (err) => {
+		  if (err) console.error(err);
+		});
+ 	}
+ }
+
+function _compressImage(inputPath,outputPath,files, onComplete,type,compression,quality,outputExt){
+    if (files.length == 0) {
+      onComplete()
+      return
+    }
+    let inputFile = files.pop()
+
+	logTime("packing:"+inputFile)
+	var outputFile
+	if(inputFile.indexOf(".jpg") != -1)
+		outputFile = inputFile.replace(".jpg",outputExt)
+	else if(inputFile.indexOf(".png") != -1)
+		outputFile = inputFile.replace(".png",outputExt)
+	else
+		return
+	outputFile = outputFile.replace(inputPath,outputPath)
+	mkdir(outputFile)
+	pack({
+	  type: type,
+	  input: inputFile,
+	  output: outputFile,
+	  compression: compression,
+	  quality: quality,
+	  verbose: false,
+	}).then(() =>{
+		// console.log('done!')
+		logTime("packed:"+inputFile)
+		 _compressImage(inputPath,outputPath,files, onComplete,type,compression,quality,outputExt)
+	});
+ }
+
+
+function compressImage(inputPath,outputPath,onComplete,type,compression,quality,outputExt){
+	walkFile([inputPath], (file, files, onFile, onComplete) => {
+      _compressImage(inputPath,outputPath,[file],()=>{
+		  walkFile(files, onFile, onComplete)
+	  },type,compression,quality,outputExt)
+	  // walkFile(files, onFile, onComplete)
+    }, onComplete)
+}
+
+const time1 = Date.now();
+
+function logTime(msg="logTime"){
+	console.info(msg,Date.now() - time1)
+}
+	
 
 function main(){
+	logTime("start...")
 	console.info("process.argv",process.argv)
 	var inputPath= process.argv[2] || ""
 	var outputFile = process.argv[3] || inputPath
-	fs.mkdir(outputFile, { recursive: true }, (err) => {
-	  if (err) throw err;
-	});
+	inputPath = dirname(inputPath)
+	outputFile = dirname(outputFile)
 	
-	compressImage(inputPath,outputFile,'etc','ETC2_RGB','etcfast','.etc.ktx')
-	compressImage(inputPath,outputFile,'pvrtc','PVRTC1_2','pvrtcnormal','.pvr.ktx')
+	compressImage(inputPath,outputFile,()=>{
+		logTime("pack etc finish!")
+		
+		compressImage(inputPath,outputFile,()=>{
+			logTime("pack pvrtc finish!")
+		},'pvrtc','PVRTC1_2','pvrtcnormal','.pvr.ktx')
+	},'etc','ETC2_RGB','etcfast','.etc.ktx')
+	
+	// compressImage(inputPath,outputFile,()=>{
+		// logTime("pack pvrtc finish!")
+	// },'pvrtc','PVRTC1_2','pvrtcnormal','.pvr.ktx')
 }
 
 main()
