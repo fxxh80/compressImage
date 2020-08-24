@@ -40,8 +40,11 @@ function mkdir(filePath){
  	if(!fs.existsSync(filePath)){
 	 	fs.mkdir(filePath, { recursive: true }, (err) => {
 		  if (err) console.error(err);
+		  onComplete()
 		});
+		return
  	}
+	onComplete()
  }
 
 function _compressImage(inputPath,outputPath,files, onComplete,type,compression,quality,outputExt){
@@ -57,22 +60,25 @@ function _compressImage(inputPath,outputPath,files, onComplete,type,compression,
 		outputFile = inputFile.replace(".jpg",outputExt)
 	else if(inputFile.indexOf(".png") != -1)
 		outputFile = inputFile.replace(".png",outputExt)
-	else
+	else{
+		_compressImage(inputPath,outputPath,files, onComplete,type,compression,quality,outputExt)
 		return
+	}
 	outputFile = outputFile.replace(inputPath,outputPath)
-	mkdir(outputFile)
-	pack({
-	  type: type,
-	  input: inputFile,
-	  output: outputFile,
-	  compression: compression,
-	  quality: quality,
-	  verbose: false,
-	}).then(() =>{
-		// console.log('done!')
-		logTime("packed:"+inputFile)
-		 _compressImage(inputPath,outputPath,files, onComplete,type,compression,quality,outputExt)
-	});
+	mkdir(outputFile,()=>{		
+		pack({
+		  type: type,
+		  input: inputFile,
+		  output: outputFile,
+		  compression: compression,
+		  quality: quality,
+		  verbose: false,
+		}).then(() =>{
+			// console.log('done!')
+			logTime("packed:"+inputFile)
+			 _compressImage(inputPath,outputPath,files, onComplete,type,compression,quality,outputExt)
+		});
+	})
  }
 
 
