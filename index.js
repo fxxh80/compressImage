@@ -34,40 +34,48 @@ function dirname(path){
  	arr.pop();
  	return arr.join("/");
  }
+function existsSync(filePath){
+	if(fs_cache[filePath] == 1){
+		// console.info("fs_cache",filePath)
+		return true
+	}
+	if (fs.existsSync(filePath)) {
+		fs_cache[filePath] = 1
+		return true
+	}
+}
 
-function mkdir(filePath){
+
 function mkdir(filePath, onComplete){
  	var filePath = dirname(filePath)
-	//require  nodejs v10.0+
- 	// if(!fs.existsSync(filePath)){
-	 	// fs.mkdir(filePath, { recursive: true }, (err) => {
-		  // if (err) console.error(err);
-		  // onComplete()
-		// });
-		// return
- 	// }
-	// onComplete()
+	if (!existsSync(filePath)) {
+		onComplete()
+		return 
+	}
 	
 	let current = "";
     const dirs = filePath.split('/');
     for (let i = 0; i < dirs.length; i++) {
       const dir = dirs[i]
       current += dir + "/";
-      if (!fs.existsSync(current)) {
+      if (!existsSync(current)) {
         fs.mkdirSync(current)
+		fs_cache[current] = 1
       }
     }
 	onComplete()
- }
-
+}
+ 
+var iPackingCnt=0
+var iPackedCnt=0
 function _compressImage(inputPath,outputPath,files, onComplete,type,compression,quality,outputExt){
     if (files.length == 0) {
       onComplete()
       return
     }
     let inputFile = files.pop()
-
-	logTime("packing:"+inputFile)
+	iPackingCnt+=1
+	logTime("packing:"+iPackingCnt + " " + inputFile + " " + type)
 	var outputFile
 	if(inputFile.indexOf(".jpg") != -1)
 		outputFile = inputFile.replace(".jpg",outputExt)
@@ -87,11 +95,12 @@ function _compressImage(inputPath,outputPath,files, onComplete,type,compression,
 		  quality: quality,
 		  verbose: false,
 		}).then(() =>{
-			// console.log('done!')
-			logTime("packed:"+inputFile)
-			 _compressImage(inputPath,outputPath,files, onComplete,type,compression,quality,outputExt)
+			iPackedCnt+=1
+			logTime("packed:"+iPackedCnt + " " + inputFile + " " + type)
+			 // _compressImage(inputPath,outputPath,files, onComplete,type,compression,quality,outputExt)
 		});
 	})
+	_compressImage(inputPath,outputPath,files, onComplete,type,compression,quality,outputExt)
  }
 
 
@@ -121,15 +130,11 @@ function main(){
 	
 	compressImage(inputPath,outputFile,()=>{
 		logTime("pack etc finish!")
-		
-		compressImage(inputPath,outputFile,()=>{
-			logTime("pack pvrtc finish!")
-		},'pvrtc','PVRTC1_2','pvrtcnormal','.pvr.ktx')
 	},'etc','ETC2_RGB','etcfast','.etc.ktx')
 	
-	// compressImage(inputPath,outputFile,()=>{
-		// logTime("pack pvrtc finish!")
-	// },'pvrtc','PVRTC1_2','pvrtcnormal','.pvr.ktx')
+	compressImage(inputPath,outputFile,()=>{
+		logTime("pack pvrtc finish!")
+	},'pvrtc','PVRTC1_2','pvrtcnormal','.pvr.ktx')
 }
 
 main()
