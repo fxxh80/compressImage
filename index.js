@@ -36,14 +36,27 @@ function dirname(path){
  }
 
 function mkdir(filePath){
+function mkdir(filePath, onComplete){
  	var filePath = dirname(filePath)
- 	if(!fs.existsSync(filePath)){
-	 	fs.mkdir(filePath, { recursive: true }, (err) => {
-		  if (err) console.error(err);
-		  onComplete()
-		});
-		return
- 	}
+	//require  nodejs v10.0+
+ 	// if(!fs.existsSync(filePath)){
+	 	// fs.mkdir(filePath, { recursive: true }, (err) => {
+		  // if (err) console.error(err);
+		  // onComplete()
+		// });
+		// return
+ 	// }
+	// onComplete()
+	
+	let current = "";
+    const dirs = filePath.split('/');
+    for (let i = 0; i < dirs.length; i++) {
+      const dir = dirs[i]
+      current += dir + "/";
+      if (!fs.existsSync(current)) {
+        fs.mkdirSync(current)
+      }
+    }
 	onComplete()
  }
 
